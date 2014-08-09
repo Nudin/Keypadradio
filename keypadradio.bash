@@ -104,21 +104,16 @@ fi
 echo "VOLUME $volume" > /tmp/radio/mpg123
 
 parseinput() {
-input=$(cat /dev/shm/radio-input)
+input=$(cat /dev/shm/radio-input | tr -d [:space:] | sed 's/\([0-9]\)KP/\1/g')
+echo X $input
 # Keys 0-9: change to corresponding channel
-    if [[ $input == KP[0-9] ]]
+    if [[ $input == KP[0-9]* ]]
     then
+      echo Senderwechsel
       # delete infos, if sender changes
       rm /tmp/radio/infos.txt
-      # on keypad, all key-infos starts with "KP", 
-      # i.e. KP1, KPEnter etc.
-      # here only KP1..KP9 is for interest
-      # so we cut the first two (0 and 1) chars to
-      # get the number
-      # TODO: Enhance mechanism for entering multiple
-      #       digts (i.e. 0-999) for multiple
-      #       sender-lists
-      DIGIT=${KEYPAD[1]:2}
+      # Extract number
+      DIGIT=${input:2}
       log "switching to Sender $DIGIT"
       echo "LOADLIST 1 ${SENDER[$DIGIT]}" > $RADIO_FIFO
     # Key '-': decrease Volume
@@ -138,7 +133,7 @@ input=$(cat /dev/shm/radio-input)
     then
       sudo killall keypad-decoder
       killall mpg123
-      break
+      #break XXX
       #sudo halt
     # Key 'Enter': Say info text
     elif [[ $input == KPEnter ]]
@@ -158,19 +153,23 @@ echo > /dev/shm/radio-input
 # In a while-loop this is set only locally
 while IFS="-" read -ra KEYPAD
 do
-echo ${KEYPAD[*]}
+  echo ${KEYPAD[*]}
   if [[ "${KEYPAD[0]}" == "Key" ]] && [[ "${KEYPAD[2]}" != "stop" ]]
   then
 	echo ${KEYPAD[1]}
-	if [[ ${KEYPAD[1]} == [0-9] ]] ; then
-		kill %$(jobs | grep parseinput | cut -d[ -f2 | cut -d] -f1) 2>/dev/null 1>&2
+	if [[ ${KEYPAD[1]} == KP[0-9] ]] ; then
+		bgjob=$(jobs | grep parseinput | cut -d[ -f2 | cut -d] -f1)
+		if [[ "$bgjob" != "" ]] ; then
+			kill %$bgjob
+		fi
 		echo -n ${KEYPAD[1]} >> /dev/shm/radio-input
 		(sleep 1; parseinput ) & 
 	else
+		echo other
 		sleep 1
 		echo -n ${KEYPAD[1]} > /dev/shm/radio-input
 		parseinput
 	fi
   fi
 done < $KEYPAD_FIFO
-
+echo ende
