@@ -105,45 +105,46 @@ echo "VOLUME $volume" > /tmp/radio/mpg123
 
 # Parse given userinput
 parseinput() {
-input=$(cat /dev/shm/radio-input | tr -d [:space:] | sed 's/\([0-9]\)KP/\1/g')
-echo X $input
-# Keys 0-9: change to corresponding channel
-    if [[ $input == KP[0-9]* ]]
-    then
-      echo Senderwechsel
-      # delete infos, if sender changes
-      rm /tmp/radio/infos.txt
-      # Extract number
-      DIGIT=${input:2}
-      log "switching to Sender $DIGIT"
-      echo "LOADLIST 1 ${SENDER[$DIGIT]}" > $RADIO_FIFO
-    # Key '-': decrease Volume
-    elif [[ $input == KPMinus ]]
-    then
-      ((volume-=10))
-      echo "VOLUME $volume" > /tmp/radio/mpg123
-      [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
-    # Key '+': increase volume
-    elif [[ $input == KPPlus ]]
-    then
-      ((volume+=10))
-      echo "VOLUME $volume" > /tmp/radio/mpg123 
-      [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
-    # Key 'Dot': exit (& shutdown)
-    elif [[ $input == KPDot ]]
-    then
-      sudo killall keypad-decoder
-      killall mpg123
-      #sudo halt
-    # Key 'Enter': Say info text
-    elif [[ $input == KPEnter ]]
-    then
-      # tell uniq lines in infos.txt
-      [[ "$speak" == "True" ]] && speak_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )"
-      [[ "$display" == "True" ]] && display_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )" \
-      		&& sleep 10 && display_text "$(tail -n 1 /tmp/radio/name.txt)" "Volume: $volume"
-    fi
-echo > /dev/shm/radio-input
+  input=$(cat /dev/shm/radio-input | tr -d [:space:] | sed 's/\([0-9]\)KP/\1/g')
+  # Keys 0-9: change to corresponding channel
+  if [[ $input == KP[0-9]* ]]
+  then
+    echo Senderwechsel
+    # delete infos, if sender changes
+    rm /tmp/radio/infos.txt
+    # Extract number
+    DIGIT=${input:2}
+    log "switching to Sender $DIGIT"
+    echo "LOADLIST 1 ${SENDER[$DIGIT]}" > $RADIO_FIFO
+  # Key '-': decrease Volume
+  elif [[ $input == KPMinus ]]
+  then
+    ((volume-=10))
+    echo "VOLUME $volume" > /tmp/radio/mpg123
+    [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
+  # Key '+': increase volume
+  elif [[ $input == KPPlus ]]
+  then
+    ((volume+=10))
+    echo "VOLUME $volume" > /tmp/radio/mpg123 
+    [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
+  # Key 'Dot': exit (& shutdown)
+  elif [[ $input == KPDot ]]
+  then
+    sudo killall keypad-decoder
+    killall mpg123
+    #sudo halt
+  # Key 'Enter': Say info text
+  elif [[ $input == KPEnter ]]
+  then
+    # tell uniq lines in infos.txt
+    [[ "$speak" == "True" ]] && \
+        speak_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )"
+    [[ "$display" == "True" ]] && \
+        display_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )" \
+        && sleep 10 && display_text "$(tail -n 1 /tmp/radio/name.txt)" "Volume: $volume"
+  fi
+  echo > /dev/shm/radio-input
 }
 
 # the input loop:
@@ -156,20 +157,20 @@ do
   echo ${KEYPAD[*]}
   if [[ "${KEYPAD[0]}" == "Key" ]] && [[ "${KEYPAD[2]}" != "stop" ]]
   then
-	echo ${KEYPAD[1]}
-	if [[ ${KEYPAD[1]} == KP[0-9] ]] ; then
-		bgjob=$(jobs | grep parseinput | cut -d[ -f2 | cut -d] -f1)
-		if [[ "$bgjob" != "" ]] ; then
-			kill %$bgjob
-		fi
-		echo -n ${KEYPAD[1]} >> /dev/shm/radio-input
-		(sleep 1; parseinput ) & 
-	else
-		echo other
-		sleep 1
-		echo -n ${KEYPAD[1]} > /dev/shm/radio-input
-		parseinput
-	fi
+  echo ${KEYPAD[1]}
+  if [[ ${KEYPAD[1]} == KP[0-9] ]] ; then
+    bgjob=$(jobs | grep parseinput | cut -d[ -f2 | cut -d] -f1)
+    if [[ "$bgjob" != "" ]] ; then
+      kill %$bgjob
+    fi
+    echo -n ${KEYPAD[1]} >> /dev/shm/radio-input
+    (sleep 1; parseinput ) & 
+  else
+    echo other
+    sleep 1
+    echo -n ${KEYPAD[1]} > /dev/shm/radio-input
+    parseinput
+  fi
   fi
 done < $KEYPAD_FIFO
 echo ende
