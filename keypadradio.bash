@@ -22,11 +22,14 @@ log() { echo -e '\e[31m'"$*"'\e[0m'; }
 log "Killing running mpg123 and evtest-new processes ..."
 sudo killall -9 keypad-decoder
 killall -9 mpg123
-rm -rf  /tmp/radio
-log "Creating /tmp/radio/ if not exist ..."
-mkdir -p /tmp/radio
-KEYPAD_FIFO="/tmp/radio/keypad"
-RADIO_FIFO="/tmp/radio/mpg123"
+rm -rf  /dev/shm/keypadradio
+log "Creating /dev/shm/keypadradio if not exist ..."
+mkdir -p /dev/shm/keypadradio
+KEYPAD_FIFO="/dev/shm/keypadradio/keypad"
+RADIO_FIFO="/dev/shm/keypadradio/mpg123"
+INPUT_FILE="/dev/shm/keypadradio/input"
+NAME_FILE="/dev/shm/keypadradio/name.txt"
+INFO_FILE="/dev/shm/keypadradio/infos.txt"
 mkfifo $KEYPAD_FIFO
 
 
@@ -50,7 +53,7 @@ echo ${MPG123_INFO[*]}
     echo Sendername=$SENDERNAME
     if [ -p $RADIO_FIFO ]
     then
-      echo $SENDERNAME > /tmp/radio/name.txt
+      echo $SENDERNAME > $NAME_FILE
       [[ "$speak" == "True" ]] && speak_text "$SENDERNAME"
       [[ "$display" == "True" ]] && display_text "$SENDERNAME" "Volume: $volume"
     fi
@@ -60,7 +63,7 @@ echo ${MPG123_INFO[*]}
     log "Infotext roh: ${MPG123_INFO[*]}"
     INFOTEXT=$(expr "${MPG123_INFO[*]}" : ".*StreamTitle='\(.*\)';")
     log "Infotext: $INFOTEXT"
-    echo "$INFOTEXT" >> /tmp/radio/infos.txt
+    echo "$INFOTEXT" >> $INFO_FILE
   fi
 done
 }
@@ -71,7 +74,7 @@ log "starting mpg123 with fifo ..."
 (mpg123 -q \
        -R \
        -o alsa \
-       --fifo /tmp/radio/mpg123 | grep -v --line-buffered "@F" | parseoutput) &
+       --fifo $RADIO_FIFO | grep -v --line-buffered "@F" | parseoutput) &
 
 # mpg123 takes a while until the pipe is created
 while [ ! -p $RADIO_FIFO ]
@@ -101,17 +104,17 @@ else
 fi
 
 # set default volume
-echo "VOLUME $volume" > /tmp/radio/mpg123
+echo "VOLUME $volume" > $RADIO_FIFO
 
 # Parse given userinput
 parseinput() {
-  input=$(cat /dev/shm/radio-input | tr -d [:space:] | sed 's/\([0-9]\)KP/\1/g')
+  input=$(cat $INPUT_FILE | tr -d [:space:] | sed 's/\([0-9]\)KP/\1/g')
   # Keys 0-9: change to corresponding channel
   if [[ $input == KP[0-9]* ]]
   then
     echo Senderwechsel
     # delete infos, if sender changes
-    rm /tmp/radio/infos.txt
+    rm $INFO_FILE
     # Extract number
     DIGIT=${input:2}
     log "switching to Sender $DIGIT"
@@ -120,14 +123,14 @@ parseinput() {
   elif [[ $input == KPMinus ]]
   then
     ((volume-=10))
-    echo "VOLUME $volume" > /tmp/radio/mpg123
-    [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
+    echo "VOLUME $volume" > $RADIO_FIFO
+    [[ "$display" == "True" ]] && display_text "$(tail -n 2 $NAME_FILE)" "Volume: $volume"
   # Key '+': increase volume
   elif [[ $input == KPPlus ]]
   then
     ((volume+=10))
-    echo "VOLUME $volume" > /tmp/radio/mpg123 
-    [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
+    echo "VOLUME $volume" > $RADIO_FIFO
+    [[ "$display" == "True" ]] && display_text "$(tail -n 2 $NAME_FILE)" "Volume: $volume"
   # Key 'Dot': exit (& shutdown)
   elif [[ $input == KPDot ]]
   then
@@ -139,12 +142,12 @@ parseinput() {
   then
     # tell uniq lines in infos.txt
     [[ "$speak" == "True" ]] && \
-        speak_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )"
+        speak_text "$(tac $INFO_FILE | awk '!seen[$0]++' | tac )"
     [[ "$display" == "True" ]] && \
-        display_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )" \
-        && sleep 10 && display_text "$(tail -n 1 /tmp/radio/name.txt)" "Volume: $volume"
+        display_text "$(tac $INFO_FILE | awk '!seen[$0]++' | tac )" \
+        && sleep 10 && display_text "$(tail -n 1 $NAME_FILE)" "Volume: $volume"
   fi
-  echo > /dev/shm/radio-input
+  echo > $INPUT_FILE
 }
 
 # the input loop:
@@ -163,12 +166,12 @@ do
     if [[ "$bgjob" != "" ]] ; then
       kill %$bgjob
     fi
-    echo -n ${KEYPAD[1]} >> /dev/shm/radio-input
+    echo -n ${KEYPAD[1]} >> $INPUT_FILE
     (sleep 1; parseinput ) & 
   else
     echo other
     sleep 1
-    echo -n ${KEYPAD[1]} > /dev/shm/radio-input
+    echo -n ${KEYPAD[1]} > $INPUT_FILE
     parseinput
   fi
   fi
