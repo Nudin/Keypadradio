@@ -1,7 +1,8 @@
-# List of sender, currently only 10 (0-9) are possible
+# List of senders
 # Sender has to be set in m3u-Format
 # asx doesnt work with mpg123
 declare -a SENDER
+SENDER[0]='http://mp3-live.swr3.de/swr3_m.m3u'
 SENDER[1]='http://streams.br.de/bayern1_2.m3u'
 SENDER[2]='http://streams.br.de/bayern2_2.m3u'
 SENDER[3]='http://streams.br.de/bayern3_2.m3u'
@@ -11,7 +12,7 @@ SENDER[6]='http://streams.br.de/b5plus_2.m3u'
 SENDER[7]='http://streams.br.de/bayernplus_2.m3u'
 SENDER[8]='http://dradio_mp3_dlf_m.akacast.akamaistream.net/7/249/142684/v1/gnl.akacast.akamaistream.net/dradio_mp3_dlf_m'
 SENDER[9]='http://metafiles.gl-systemhaus.de/hr/hr3_2.m3u'
-SENDER[0]='http://mp3-live.swr3.de/swr3_m.m3u'
+SENDER[10]='http://mp3.theradio.cc/'
 
 # keypad url of the keypad with should controle the player
 # Be aware: url will differ on exact hardware & on used usb-port!
@@ -20,7 +21,7 @@ SENDER[0]='http://mp3-live.swr3.de/swr3_m.m3u'
 KEYPAD_URL="/dev/input/by-id/usb-1bcf_SilverCrest_STMS_2219_A1-event-kbd"
 
 # Default sender
-SENDER_ON_START=8
+SENDER_ON_START=3
 
 # Default volume (0-100)
 volume=70
@@ -29,4 +30,4 @@ volume=70
 speak=False
 
 # Enable display (True/False)
-display=True
+display=False

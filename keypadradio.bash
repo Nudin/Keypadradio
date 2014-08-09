@@ -103,6 +103,7 @@ fi
 # set default volume
 echo "VOLUME $volume" > /tmp/radio/mpg123
 
+# Parse given userinput
 parseinput() {
 input=$(cat /dev/shm/radio-input | tr -d [:space:] | sed 's/\([0-9]\)KP/\1/g')
 echo X $input
@@ -133,7 +134,6 @@ echo X $input
     then
       sudo killall keypad-decoder
       killall mpg123
-      #break XXX
       #sudo halt
     # Key 'Enter': Say info text
     elif [[ $input == KPEnter ]]
@@ -146,7 +146,7 @@ echo X $input
 echo > /dev/shm/radio-input
 }
 
-# the main loop:
+# the input loop:
 # "read -ra" creates the array (-a option) KEYPAD and reads the
 # input of keypad-pipe with "\" used as standard char (-r option)
 # IFS="-" sets "-" as delimiter for array-distribution.
