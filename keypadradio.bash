@@ -151,12 +151,10 @@ echo ${KEYPAD[*]}
     # Key 'Enter': Say info text
     elif [[ ${KEYPAD[1]} == KPEnter ]] && [[ "${KEYPAD[2]}" == "start" ]]
     then
-      # tell the last 5 lines of sender info
-      # TODO: look for repeating lines in infos.txt
-      #       for the right number of lines to harvest
-      [[ "$speak" == "True" ]] && speak_text "$(tail -n 5 /tmp/radio/infos.txt)"
-      [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/infos.txt)" \
-      		&& sleep 10 && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
+      # tell uniq lines in infos.txt
+      [[ "$speak" == "True" ]] && speak_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )"
+      [[ "$display" == "True" ]] && display_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )" \
+      		&& sleep 10 && display_text "$(tail -n 1 /tmp/radio/name.txt)" "Volume: $volume"
     fi
   fi
 done < $KEYPAD_FIFO
