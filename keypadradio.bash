@@ -103,18 +103,10 @@ fi
 # set default volume
 echo "VOLUME $volume" > /tmp/radio/mpg123
 
-# the main loop:
-# "read -ra" creates the array (-a option) KEYPAD and reads the
-# input of keypad-pipe with "\" used as standard char (-r option)
-# IFS="-" sets "-" as delimiter for array-distribution.
-# In a while-loop this is set only locally
-while IFS="-" read -ra KEYPAD
-do
-echo ${KEYPAD[*]}
-  if [[ "${KEYPAD[0]}" == "Key" ]] && [[ "${KEYPAD[2]}" != "stop" ]]
-  then
-    # Keys 0-9: change to corresponding channel
-    if [[ ${KEYPAD[1]} == KP[0-9] ]] && [[ "${KEYPAD[2]}" == "start" ]]
+parseinput() {
+input=$(cat /dev/shm/radio-input)
+# Keys 0-9: change to corresponding channel
+    if [[ $input == KP[0-9] ]]
     then
       # delete infos, if sender changes
       rm /tmp/radio/infos.txt
@@ -130,32 +122,55 @@ echo ${KEYPAD[*]}
       log "switching to Sender $DIGIT"
       echo "LOADLIST 1 ${SENDER[$DIGIT]}" > $RADIO_FIFO
     # Key '-': decrease Volume
-    elif [[ ${KEYPAD[1]} == KPMinus ]]
+    elif [[ $input == KPMinus ]]
     then
       ((volume-=10))
       echo "VOLUME $volume" > /tmp/radio/mpg123
       [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
     # Key '+': increase volume
-    elif [[ ${KEYPAD[1]} == KPPlus ]]
+    elif [[ $input == KPPlus ]]
     then
       ((volume+=10))
       echo "VOLUME $volume" > /tmp/radio/mpg123 
       [[ "$display" == "True" ]] && display_text "$(tail -n 2 /tmp/radio/name.txt)" "Volume: $volume"
     # Key 'Dot': exit (& shutdown)
-    elif [[ ${KEYPAD[1]} == KPDot ]]
+    elif [[ $input == KPDot ]]
     then
       sudo killall keypad-decoder
       killall mpg123
       break
       #sudo halt
     # Key 'Enter': Say info text
-    elif [[ ${KEYPAD[1]} == KPEnter ]] && [[ "${KEYPAD[2]}" == "start" ]]
+    elif [[ $input == KPEnter ]]
     then
       # tell uniq lines in infos.txt
       [[ "$speak" == "True" ]] && speak_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )"
       [[ "$display" == "True" ]] && display_text "$(tac /tmp/radio/infos.txt | awk '!seen[$0]++' | tac )" \
       		&& sleep 10 && display_text "$(tail -n 1 /tmp/radio/name.txt)" "Volume: $volume"
     fi
+echo > /dev/shm/radio-input
+}
+
+# the main loop:
+# "read -ra" creates the array (-a option) KEYPAD and reads the
+# input of keypad-pipe with "\" used as standard char (-r option)
+# IFS="-" sets "-" as delimiter for array-distribution.
+# In a while-loop this is set only locally
+while IFS="-" read -ra KEYPAD
+do
+echo ${KEYPAD[*]}
+  if [[ "${KEYPAD[0]}" == "Key" ]] && [[ "${KEYPAD[2]}" != "stop" ]]
+  then
+	echo ${KEYPAD[1]}
+	if [[ ${KEYPAD[1]} == [0-9] ]] ; then
+		kill %$(jobs | grep parseinput | cut -d[ -f2 | cut -d] -f1) 2>/dev/null 1>&2
+		echo -n ${KEYPAD[1]} >> /dev/shm/radio-input
+		(sleep 1; parseinput ) & 
+	else
+		sleep 1
+		echo -n ${KEYPAD[1]} > /dev/shm/radio-input
+		parseinput
+	fi
   fi
 done < $KEYPAD_FIFO
 
